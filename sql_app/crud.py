@@ -12,6 +12,16 @@ def get_customers(db: Session, skip: int = 0, limit: int = 10):
 
 
 def create_customer(db: Session, customer: schemas.Customer):
+    existing_customer = (
+        db.query(models.Customer)
+        .filter(models.Customer.email == customer.email)
+        .first()
+    )
+
+    if existing_customer:
+        print("Customer already exists:")
+        return existing_customer
+
     new_customer = models.Customer(name=customer.name, email=customer.email)
     db.add(new_customer)
     db.commit()

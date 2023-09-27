@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
+from kafka import send_to_kafka
 
 from sql_app import crud, models, schemas
 from sql_app.database import SessionLocal, engine
@@ -51,12 +52,34 @@ async def get_customers(skip: int = 0, limit: int = 10, db: Session = Depends(ge
 @app.post("/customers/")
 async def create_customer(customer: schemas.Customer, db: Session = Depends(get_db)):
     new_customer = crud.create_customer(db, customer)
+    if customer.forward_message:
+        new_customer_data = {
+            "ID": new_customer.ID,
+            "name": new_customer.name,
+            "email": new_customer.email,
+        }
+        send_to_kafka(
+            "customer-events",
+            {"event_type": "customer_created", "customer": new_customer_data},
+        )
     return new_customer
 
 
 @app.put("/customers/{customer_id}/")
 async def update_customer(
-    customer_id: int, customer: schemas.Customer, db: Session = Depends(get_db)
+    customer_id: int,
+    customer: schemas.Customer,
+    db: Session = Depends(get_db),
 ):
     updated_customer = crud.update_customer(db, customer_id, customer)
+    if customer.forward_message:
+        updated_customer_data = {
+            "ID": updated_customer.ID,
+            "name": updated_customer.name,
+            "email": updated_customer.email,
+        }
+        send_to_kafka(
+            "customer-events",
+            {"event_type": "customer_updated", "customer": updated_customer_data},
+        )
     return updated_customer
